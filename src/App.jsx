@@ -89,7 +89,7 @@ function ChordDiagram({ name, size = 120 }) {
 function ArtistCard({ artist, onClick, index }) {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setVisible(true), index * 80);
+    const t = setTimeout(() => setVisible(true), index * 60);
     return () => clearTimeout(t);
   }, [index]);
 
@@ -100,30 +100,25 @@ function ArtistCard({ artist, onClick, index }) {
       background: `linear-gradient(135deg, ${artist.color}18, ${artist.color}08)`,
       border: `1px solid ${artist.color}30`,
       borderRadius: 18,
-      padding: "22px 24px",
+      padding: "18px 10px",
       cursor: "pointer",
       transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
       opacity: visible ? 1 : 0,
-      transform: visible ? "translateY(0)" : "translateY(20px)",
-      direction: "rtl",
+      transform: visible ? "translateY(0)" : "translateY(15px)",
+      textAlign: "center",
     }}
-      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px) scale(1.01)"; e.currentTarget.style.borderColor = artist.color + "60"; }}
+      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px) scale(1.03)"; e.currentTarget.style.borderColor = artist.color + "60"; }}
       onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0) scale(1)"; e.currentTarget.style.borderColor = artist.color + "30"; }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <div style={{
-          width: 52, height: 52, borderRadius: 14,
-          background: `linear-gradient(135deg, ${artist.color}, ${artist.color}80)`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 26, flexShrink: 0,
-        }}>{artist.image}</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 18, fontWeight: 700, color: "#F5E6D3", fontFamily: "'Heebo', sans-serif", marginBottom: 4 }}>{artist.name}</div>
-          <div style={{ fontSize: 13, color: "#F5E6D3", opacity: 0.5, fontFamily: "'Heebo', sans-serif" }}>
-            {songCount} {songCount === 1 ? "שיר" : "שירים"}
-          </div>
-        </div>
-        <span style={{ fontSize: 20, color: "#F5E6D3", opacity: 0.3 }}>←</span>
+      <div style={{
+        width: 56, height: 56, borderRadius: 16,
+        background: `linear-gradient(135deg, ${artist.color}, ${artist.color}80)`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 28, margin: "0 auto 10px",
+      }}>{artist.image}</div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: "#F5E6D3", fontFamily: "'Heebo', sans-serif", marginBottom: 3, direction: "rtl" }}>{artist.name}</div>
+      <div style={{ fontSize: 12, color: "#F5E6D3", opacity: 0.4, fontFamily: "'Heebo', sans-serif" }}>
+        {songCount} {songCount === 1 ? "שיר" : "שירים"}
       </div>
     </div>
   );
@@ -188,7 +183,7 @@ function SongCard({ song, color, onClick, index }) {
 
 // תצוגת שיר - מילים עם אקורדים
 function SongView({ song, artist, onBack }) {
-  const [activeChord, setActiveChord] = useState(null);
+  const [hoveredChord, setHoveredChord] = useState(null);
   const chords = extractChords(song.lyrics);
   const lines = song.lyrics.trim().split("\n");
 
@@ -220,32 +215,6 @@ function SongView({ song, artist, onBack }) {
         }}>{song.difficulty}</span>
       </div>
 
-      {/* אקורדים מהירים */}
-      <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
-        {chords.map(c => (
-          <button key={c} onClick={() => setActiveChord(activeChord === c ? null : c)} style={{
-            background: activeChord === c ? artist.color : artist.color + "15",
-            color: activeChord === c ? "#1A1A2E" : artist.color,
-            border: `1.5px solid ${activeChord === c ? artist.color : artist.color + "40"}`,
-            borderRadius: 10, padding: "8px 18px", cursor: "pointer",
-            fontSize: 16, fontWeight: 600, fontFamily: "'Instrument Serif', serif",
-            transition: "all 0.25s ease",
-          }}>{c}</button>
-        ))}
-      </div>
-
-      {/* דיאגרמת אקורד פעילה */}
-      {activeChord && (
-        <div style={{
-          display: "flex", justifyContent: "center",
-          background: "#ffffff06", borderRadius: 16, padding: 24,
-          border: "1px solid #ffffff0a", marginBottom: 24,
-          animation: "fadeIn 0.3s ease",
-        }}>
-          <ChordDiagram name={activeChord} size={160} />
-        </div>
-      )}
-
       {/* מילים + אקורדים */}
       <div style={{
         background: "#ffffff06", borderRadius: 18, padding: "24px 20px",
@@ -253,39 +222,72 @@ function SongView({ song, artist, onBack }) {
       }}>
         {lines.map((line, i) => {
           if (line.trim() === "") {
-            return <div key={i} style={{ height: 16 }} />;
+            return <div key={i} style={{ height: 20 }} />;
           }
           const parts = parseLine(line);
+          const hasChords = parts.some(p => p.chord);
           return (
-            <div key={i} style={{ marginBottom: 8, lineHeight: 1.8 }}>
-              {parts.map((part, j) => (
-                <span key={j} style={{ position: "relative", display: "inline" }}>
-                  {part.chord && (
-                    <span
-                      onClick={() => setActiveChord(activeChord === part.chord ? null : part.chord)}
-                      style={{
+            <div key={i} style={{ marginBottom: hasChords ? 6 : 4 }}>
+              {hasChords ? (
+                <div style={{ display: "inline" }}>
+                  {parts.map((part, j) => (
+                    <span key={j} style={{ display: "inline-block", verticalAlign: "top", position: "relative" }}>
+                      <span style={{
+                        display: "block",
+                        height: 22,
                         color: artist.color,
                         fontFamily: "'Instrument Serif', serif",
                         fontWeight: 700,
                         fontSize: 15,
-                        cursor: "pointer",
-                        marginLeft: 2,
-                        marginRight: 2,
-                        padding: "1px 4px",
+                        cursor: part.chord ? "pointer" : "default",
+                        visibility: part.chord ? "visible" : "hidden",
+                        padding: "0 2px",
                         borderRadius: 4,
-                        background: activeChord === part.chord ? artist.color + "25" : "transparent",
+                        background: part.chord && hoveredChord === part.chord ? artist.color + "25" : "transparent",
                         transition: "background 0.2s ease",
                       }}
-                    >{part.chord}</span>
-                  )}
-                  <span style={{
-                    color: "#F5E6D3",
-                    fontFamily: "'Heebo', sans-serif",
-                    fontSize: 16,
-                    fontWeight: 400,
-                  }}>{part.text}</span>
-                </span>
-              ))}
+                        onMouseEnter={part.chord ? () => setHoveredChord(part.chord) : undefined}
+                        onMouseLeave={part.chord ? () => setHoveredChord(null) : undefined}
+                      >{part.chord || "\u00A0"}
+                      {part.chord && hoveredChord === part.chord && (
+                        <div style={{
+                          position: "absolute",
+                          bottom: "100%",
+                          left: "50%",
+                          transform: "translateX(-50%)",
+                          zIndex: 100,
+                          background: "#1e1e3a",
+                          borderRadius: 14,
+                          padding: 12,
+                          border: `1.5px solid ${artist.color}40`,
+                          boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+                          animation: "fadeIn 0.15s ease",
+                          pointerEvents: "none",
+                        }}>
+                          <ChordDiagram name={part.chord} size={110} />
+                        </div>
+                      )}
+                      </span>
+                      <span style={{
+                        display: "block",
+                        color: "#F5E6D3",
+                        fontFamily: "'Heebo', sans-serif",
+                        fontSize: 16,
+                        fontWeight: 400,
+                        whiteSpace: "pre-wrap",
+                      }}>{part.text || "\u00A0"}</span>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div style={{
+                  color: "#F5E6D3",
+                  fontFamily: "'Heebo', sans-serif",
+                  fontSize: 16,
+                  fontWeight: 400,
+                  lineHeight: 1.8,
+                }}>{line}</div>
+              )}
             </div>
           );
         })}
@@ -296,11 +298,9 @@ function SongView({ song, artist, onBack }) {
         <p style={{ fontFamily: "'Heebo', sans-serif", color: "#F5E6D3", opacity: 0.4, fontSize: 13, textAlign: "center", marginBottom: 14, direction: "rtl" }}>כל האקורדים בשיר</p>
         <div style={{ display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
           {chords.map(c => (
-            <div key={c} onClick={() => setActiveChord(activeChord === c ? null : c)} style={{
-              cursor: "pointer",
-              opacity: activeChord === c ? 1 : 0.6,
+            <div key={c} style={{
+              opacity: 0.8,
               transition: "all 0.25s ease",
-              transform: activeChord === c ? "scale(1.08)" : "scale(1)",
             }}>
               <ChordDiagram name={c} size={90} />
             </div>
@@ -314,7 +314,7 @@ function SongView({ song, artist, onBack }) {
 // ===== אפליקציה ראשית =====
 
 export default function App() {
-  const [view, setView] = useState("artists"); // artists | songs | song
+  const [view, setView] = useState("artists"); // artists | songs | song | chords
   const [selectedArtist, setSelectedArtist] = useState(null);
   const [selectedSong, setSelectedSong] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -336,6 +336,9 @@ export default function App() {
       setView("songs");
     } else if (view === "songs") {
       setSelectedArtist(null);
+      setView("artists");
+      setSearchQuery("");
+    } else if (view === "chords") {
       setView("artists");
       setSearchQuery("");
     }
@@ -438,8 +441,26 @@ export default function App() {
               />
             </div>
 
+            {/* כפתור מילון אקורדים */}
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <button onClick={() => { setSearchQuery(""); setView("chords"); }} style={{
+                background: "linear-gradient(135deg, #FF6B3518, #FF6B3508)",
+                border: "1px solid #FF6B3530",
+                borderRadius: 14, padding: "12px 24px",
+                cursor: "pointer", color: "#FF6B35",
+                fontSize: 15, fontFamily: "'Heebo', sans-serif", fontWeight: 600,
+                transition: "all 0.25s ease", direction: "rtl",
+                display: "inline-flex", alignItems: "center", gap: 8,
+              }}
+                onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg, #FF6B3528, #FF6B3518)"; e.currentTarget.style.borderColor = "#FF6B3560"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg, #FF6B3518, #FF6B3508)"; e.currentTarget.style.borderColor = "#FF6B3530"; }}
+              >
+                🎸 מילון אקורדים
+              </button>
+            </div>
+
             {/* רשימת זמרים */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingBottom: 30 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, paddingBottom: 30 }}>
               {filteredArtists.map((artist, i) => (
                 <ArtistCard key={artist.id} artist={artist} index={i} onClick={() => goToArtist(artist)} />
               ))}
@@ -489,6 +510,72 @@ export default function App() {
         {view === "song" && selectedSong && selectedArtist && (
           <SongView song={selectedSong} artist={selectedArtist} onBack={goBack} />
         )}
+
+        {/* === מסך מילון אקורדים === */}
+        {view === "chords" && (() => {
+          const allChords = Object.keys(CHORD_DB);
+          const filtered = searchQuery
+            ? allChords.filter(c => c.toLowerCase().includes(searchQuery.toLowerCase()))
+            : allChords;
+          return (
+          <div style={{ animation: "fadeIn 0.4s ease" }}>
+            <button onClick={goBack} style={{
+              background: "none", border: "none", color: "#F5E6D3", opacity: 0.6,
+              cursor: "pointer", fontSize: 15, fontFamily: "'Heebo', sans-serif",
+              display: "flex", alignItems: "center", gap: 6, marginBottom: 20, padding: 0,
+            }}>
+              → חזרה לזמרים
+            </button>
+
+            <div style={{ textAlign: "center", direction: "rtl", marginBottom: 20 }}>
+              <h2 style={{ fontFamily: "'Heebo', sans-serif", color: "#F5E6D3", fontSize: 22, fontWeight: 700, margin: 0 }}>מילון אקורדים</h2>
+              <p style={{ fontSize: 13, color: "#F5E6D3", opacity: 0.4, marginTop: 6 }}>
+                {allChords.length} אקורדים
+              </p>
+            </div>
+
+            <div style={{ marginBottom: 18 }}>
+              <input
+                type="text"
+                placeholder="🔍 חיפוש אקורד... (Am, G7, Dm...)"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{
+                  width: "100%", padding: "12px 16px", borderRadius: 14,
+                  border: "1px solid #ffffff12", background: "#ffffff08",
+                  color: "#F5E6D3", fontSize: 15, fontFamily: "'Instrument Serif', serif",
+                  direction: "ltr", outline: "none", textAlign: "center",
+                  transition: "border-color 0.25s ease",
+                }}
+                onFocus={e => e.target.style.borderColor = "#FF6B3540"}
+                onBlur={e => e.target.style.borderColor = "#ffffff12"}
+              />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, paddingBottom: 30 }}>
+              {filtered.map((name, i) => (
+                <div key={name} style={{
+                  background: "#ffffff06", borderRadius: 16, padding: "12px 4px",
+                  border: "1px solid #ffffff0a", textAlign: "center",
+                  transition: "all 0.3s ease",
+                  animation: `fadeIn 0.4s ease ${i * 30}ms both`,
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "#ffffff0c"; e.currentTarget.style.borderColor = "#FF6B3530"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "#ffffff06"; e.currentTarget.style.borderColor = "#ffffff0a"; }}
+                >
+                  <ChordDiagram name={name} size={95} />
+                </div>
+              ))}
+              {filtered.length === 0 && (
+                <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: 40, color: "#F5E6D3", opacity: 0.3 }}>
+                  <span style={{ fontSize: 40, display: "block", marginBottom: 12 }}>🎸</span>
+                  לא נמצא אקורד
+                </div>
+              )}
+            </div>
+          </div>
+          );
+        })()}
 
         {/* Footer */}
         <div style={{

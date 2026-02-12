@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.tab4u.com)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "Bash(taskkill:*)",
+      "Bash(timeout /t 2 /nobreak)",
+      "Bash(curl:*)"
+    ]
+  }
+}
