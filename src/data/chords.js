@@ -3,7 +3,7 @@
 
 export const CHORD_DB = {
   // Major
-  C:  { fingers: [[1,0],[2,1],[3,0],[4,2],[5,3]], barres: [], muted: [6], open: [1,3] },
+  C:  { fingers: [[2,1],[4,2],[5,3]], barres: [], muted: [6], open: [1,3] },
   D:  { fingers: [[1,2],[2,3],[3,2]], barres: [], muted: [5,6], open: [4] },
   E:  { fingers: [[3,1],[4,2],[5,2]], barres: [], muted: [], open: [1,2,6] },
   F:  { fingers: [[2,1],[3,2],[4,3]], barres: [{from:1,to:6,fret:1}], muted: [], open: [] },
