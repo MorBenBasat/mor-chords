@@ -5,7 +5,8 @@
       "mcp__plugin_playwright_playwright__browser_navigate",
       "Bash(taskkill:*)",
       "Bash(timeout /t 2 /nobreak)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "mcp__plugin_playwright_playwright__browser_install"
     ]
   }
 }

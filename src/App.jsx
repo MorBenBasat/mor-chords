@@ -41,6 +41,71 @@ function parseLine(line) {
   return parts;
 }
 
+// פירוק ChordPro לשורות של מילים עם אקורדים (לעורך)
+function lyricsToWordLines(lyrics) {
+  return lyrics.trim().split("\n").map(line => {
+    if (line.trim() === "") return [];
+    const words = [];
+    const regex = /\[([A-Za-z0-9#]+)\]/g;
+    let clean = "";
+    let chordPositions = [];
+    let lastIdx = 0;
+    let m;
+    while ((m = regex.exec(line)) !== null) {
+      clean += line.slice(lastIdx, m.index);
+      chordPositions.push({ pos: clean.length, chord: m[1] });
+      lastIdx = m.index + m[0].length;
+    }
+    clean += line.slice(lastIdx);
+    const splitWords = clean.split(/(\s+)/);
+    let charIdx = 0;
+    for (const seg of splitWords) {
+      if (seg.match(/^\s+$/)) { charIdx += seg.length; continue; }
+      if (seg === "") continue;
+      const chord = chordPositions.find(cp => cp.pos >= charIdx && cp.pos <= charIdx + seg.length);
+      words.push({ word: seg, chord: chord ? chord.chord : null });
+      charIdx += seg.length + 1;
+    }
+    return words;
+  });
+}
+
+// בנייה חזרה ל-ChordPro מאובייקט מילים
+function wordLinesToLyrics(lines) {
+  return lines.map(words => {
+    if (words.length === 0) return "";
+    return words.map(w => (w.chord ? `[${w.chord}]` : "") + w.word).join(" ");
+  }).join("\n");
+}
+
+// קריאת שיר ערוך מ-localStorage
+function getEditedLyrics(artistId, songId) {
+  try {
+    const data = JSON.parse(localStorage.getItem("morchords-edits") || "{}");
+    return data[`${artistId}-${songId}`] || null;
+  } catch { return null; }
+}
+
+// שמירת שיר ערוך ל-localStorage
+function saveEditedLyrics(artistId, songId, lyrics) {
+  try {
+    const data = JSON.parse(localStorage.getItem("morchords-edits") || "{}");
+    data[`${artistId}-${songId}`] = lyrics;
+    localStorage.setItem("morchords-edits", JSON.stringify(data));
+  } catch {}
+}
+
+// מחיקת שיר ערוך מ-localStorage
+function deleteEditedLyrics(artistId, songId) {
+  try {
+    const data = JSON.parse(localStorage.getItem("morchords-edits") || "{}");
+    delete data[`${artistId}-${songId}`];
+    localStorage.setItem("morchords-edits", JSON.stringify(data));
+  } catch {}
+}
+
+const ADMIN_PASSWORD = "mor2024";
+
 // ===== קומפוננטות =====
 
 function ChordDiagram({ name, size = 120 }) {
@@ -182,7 +247,7 @@ function SongCard({ song, color, onClick, index }) {
 }
 
 // תצוגת שיר - מילים עם אקורדים
-function SongView({ song, artist, onBack }) {
+function SongView({ song, artist, onBack, isAdmin, onEdit }) {
   const [hoveredChord, setHoveredChord] = useState(null);
   const chords = extractChords(song.lyrics);
   const lines = song.lyrics.trim().split("\n");
@@ -213,12 +278,20 @@ function SongView({ song, artist, onBack }) {
           background: song.difficulty === "קל" ? "#4ECDC420" : "#FFB74D20",
           padding: "2px 12px", borderRadius: 20, fontFamily: "'Heebo', sans-serif",
         }}>{song.difficulty}</span>
+        {isAdmin && (
+          <button onClick={onEdit} style={{
+            display: "block", margin: "12px auto 0", background: "#FF6B3520",
+            border: "1px solid #FF6B3540", borderRadius: 10, padding: "6px 20px",
+            color: "#FF6B35", fontSize: 13, fontFamily: "'Heebo', sans-serif",
+            fontWeight: 600, cursor: "pointer",
+          }}>עריכת אקורדים</button>
+        )}
       </div>
 
       {/* מילים + אקורדים */}
       <div style={{
         background: "#ffffff06", borderRadius: 18, padding: "24px 20px",
-        border: "1px solid #ffffff0a", direction: "rtl",
+        border: "1px solid #ffffff0a", direction: "rtl", textAlign: "right",
       }}>
         {lines.map((line, i) => {
           if (line.trim() === "") {
@@ -231,7 +304,28 @@ function SongView({ song, artist, onBack }) {
               {hasChords ? (
                 <div style={{ display: "inline" }}>
                   {parts.map((part, j) => (
-                    <span key={j} style={{ display: "inline-block", verticalAlign: "top", position: "relative" }}>
+                    <span key={j} style={{ display: "inline-block", verticalAlign: "top", position: "relative" }}
+                      onMouseEnter={part.chord ? () => setHoveredChord(`${i}-${j}`) : undefined}
+                      onMouseLeave={part.chord ? () => setHoveredChord(null) : undefined}
+                    >
+                      {part.chord && hoveredChord === `${i}-${j}` && (
+                        <div style={{
+                          position: "absolute",
+                          bottom: "100%",
+                          left: "50%",
+                          transform: "translateX(-50%)",
+                          marginBottom: 4,
+                          zIndex: 100,
+                          background: "#1e1e3a",
+                          borderRadius: 14,
+                          padding: 12,
+                          border: `1.5px solid ${artist.color}40`,
+                          boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+                          pointerEvents: "none",
+                        }}>
+                          <ChordDiagram name={part.chord} size={110} />
+                        </div>
+                      )}
                       <span style={{
                         display: "block",
                         height: 22,
@@ -243,31 +337,9 @@ function SongView({ song, artist, onBack }) {
                         visibility: part.chord ? "visible" : "hidden",
                         padding: "0 2px",
                         borderRadius: 4,
-                        background: part.chord && hoveredChord === part.chord ? artist.color + "25" : "transparent",
+                        background: part.chord && hoveredChord === `${i}-${j}` ? artist.color + "25" : "transparent",
                         transition: "background 0.2s ease",
-                      }}
-                        onMouseEnter={part.chord ? () => setHoveredChord(part.chord) : undefined}
-                        onMouseLeave={part.chord ? () => setHoveredChord(null) : undefined}
-                      >{part.chord || "\u00A0"}
-                      {part.chord && hoveredChord === part.chord && (
-                        <div style={{
-                          position: "absolute",
-                          bottom: "100%",
-                          left: "50%",
-                          transform: "translateX(-50%)",
-                          zIndex: 100,
-                          background: "#1e1e3a",
-                          borderRadius: 14,
-                          padding: 12,
-                          border: `1.5px solid ${artist.color}40`,
-                          boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
-                          animation: "fadeIn 0.15s ease",
-                          pointerEvents: "none",
-                        }}>
-                          <ChordDiagram name={part.chord} size={110} />
-                        </div>
-                      )}
-                      </span>
+                      }}>{part.chord || "\u00A0"}</span>
                       <span style={{
                         display: "block",
                         color: "#F5E6D3",
@@ -311,13 +383,163 @@ function SongView({ song, artist, onBack }) {
   );
 }
 
+// עורך שיר - גרירת אקורדים למילים
+function SongEditor({ song, artist, onSave, onCancel }) {
+  const [editLines, setEditLines] = useState(() => lyricsToWordLines(song.lyrics));
+  const [draggedChord, setDraggedChord] = useState(null);
+  const [dragOverTarget, setDragOverTarget] = useState(null);
+  const allChords = Object.keys(CHORD_DB);
+
+  const handleDrop = (lineIdx, wordIdx) => {
+    if (!draggedChord) return;
+    setEditLines(prev => {
+      const next = prev.map(l => l.map(w => ({ ...w })));
+      next[lineIdx][wordIdx].chord = draggedChord;
+      return next;
+    });
+    setDraggedChord(null);
+    setDragOverTarget(null);
+  };
+
+  const removeChord = (lineIdx, wordIdx) => {
+    setEditLines(prev => {
+      const next = prev.map(l => l.map(w => ({ ...w })));
+      next[lineIdx][wordIdx].chord = null;
+      return next;
+    });
+  };
+
+  const handleSave = () => {
+    onSave(wordLinesToLyrics(editLines));
+  };
+
+  return (
+    <div style={{ animation: "fadeIn 0.4s ease" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <button onClick={onCancel} style={{
+          background: "none", border: "none", color: "#F5E6D3", opacity: 0.6,
+          cursor: "pointer", fontSize: 15, fontFamily: "'Heebo', sans-serif", padding: 0,
+        }}>→ ביטול</button>
+        <button onClick={handleSave} style={{
+          background: "#FF6B35", border: "none", borderRadius: 10,
+          padding: "8px 24px", color: "#1A1A2E", fontSize: 14,
+          fontFamily: "'Heebo', sans-serif", fontWeight: 700, cursor: "pointer",
+        }}>שמור שינויים</button>
+      </div>
+
+      <div style={{ textAlign: "center", direction: "rtl", marginBottom: 20 }}>
+        <h2 style={{ fontFamily: "'Heebo', sans-serif", color: "#F5E6D3", fontSize: 20, margin: 0, fontWeight: 700 }}>
+          עריכה: {song.title}
+        </h2>
+        <p style={{ fontFamily: "'Heebo', sans-serif", color: "#F5E6D3", opacity: 0.4, fontSize: 13, marginTop: 4 }}>
+          גרור אקורד מהפלטה למעל מילה | לחץ על אקורד כתום למחיקה
+        </p>
+      </div>
+
+      {/* פלטת אקורדים */}
+      <div style={{
+        background: "#ffffff06", borderRadius: 14, padding: "12px 14px",
+        border: "1px solid #ffffff0a", marginBottom: 20,
+        display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center",
+      }}>
+        {allChords.map(c => (
+          <div
+            key={c}
+            draggable="true"
+            onDragStart={() => setDraggedChord(c)}
+            onDragEnd={() => { setDraggedChord(null); setDragOverTarget(null); }}
+            style={{
+              background: artist.color + "20", color: artist.color,
+              border: `1px solid ${artist.color}40`,
+              borderRadius: 8, padding: "4px 12px", fontSize: 14,
+              fontWeight: 600, fontFamily: "'Instrument Serif', serif",
+              cursor: "grab", userSelect: "none",
+              transition: "all 0.15s ease",
+            }}
+          >{c}</div>
+        ))}
+      </div>
+
+      {/* שורות מילים */}
+      <div style={{
+        background: "#ffffff06", borderRadius: 18, padding: "24px 20px",
+        border: "1px solid #ffffff0a", direction: "rtl",
+      }}>
+        {editLines.map((words, lineIdx) => {
+          if (words.length === 0) return <div key={lineIdx} style={{ height: 20 }} />;
+          return (
+            <div key={lineIdx} style={{ marginBottom: 10, display: "flex", flexWrap: "wrap", gap: 4 }}>
+              {words.map((w, wordIdx) => {
+                const isOver = dragOverTarget === `${lineIdx}-${wordIdx}`;
+                return (
+                  <div
+                    key={wordIdx}
+                    onDragOver={e => { e.preventDefault(); setDragOverTarget(`${lineIdx}-${wordIdx}`); }}
+                    onDragLeave={() => setDragOverTarget(null)}
+                    onDrop={e => { e.preventDefault(); handleDrop(lineIdx, wordIdx); }}
+                    style={{
+                      display: "inline-flex", flexDirection: "column", alignItems: "center",
+                      padding: "2px 4px", borderRadius: 6,
+                      background: isOver ? artist.color + "25" : "transparent",
+                      border: isOver ? `1.5px dashed ${artist.color}` : "1.5px dashed transparent",
+                      transition: "all 0.15s ease",
+                      minWidth: 30,
+                    }}
+                  >
+                    <span
+                      onClick={w.chord ? () => removeChord(lineIdx, wordIdx) : undefined}
+                      style={{
+                        fontSize: 13, fontWeight: 700, height: 20,
+                        color: w.chord ? artist.color : "transparent",
+                        fontFamily: "'Instrument Serif', serif",
+                        cursor: w.chord ? "pointer" : "default",
+                        userSelect: "none",
+                      }}
+                    >{w.chord || "\u00A0"}</span>
+                    <span style={{
+                      color: "#F5E6D3", fontSize: 15,
+                      fontFamily: "'Heebo', sans-serif",
+                    }}>{w.word}</span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* כפתורים תחתונים */}
+      <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 20 }}>
+        <button onClick={handleSave} style={{
+          background: "#FF6B35", border: "none", borderRadius: 12,
+          padding: "12px 32px", color: "#1A1A2E", fontSize: 15,
+          fontFamily: "'Heebo', sans-serif", fontWeight: 700, cursor: "pointer",
+        }}>שמור שינויים</button>
+        <button onClick={onCancel} style={{
+          background: "#ffffff08", border: "1px solid #ffffff15", borderRadius: 12,
+          padding: "12px 24px", color: "#F5E6D3", fontSize: 15,
+          fontFamily: "'Heebo', sans-serif", fontWeight: 500, cursor: "pointer",
+        }}>ביטול</button>
+        <button onClick={() => setEditLines(lyricsToWordLines(song.lyrics))} style={{
+          background: "none", border: "1px solid #ff444430", borderRadius: 12,
+          padding: "12px 20px", color: "#ff6666", fontSize: 13,
+          fontFamily: "'Heebo', sans-serif", fontWeight: 500, cursor: "pointer",
+        }}>איפוס למקור</button>
+      </div>
+    </div>
+  );
+}
+
 // ===== אפליקציה ראשית =====
 
 export default function App() {
-  const [view, setView] = useState("artists"); // artists | songs | song | chords
+  const [view, setView] = useState("artists"); // artists | songs | song | chords | edit-song
   const [selectedArtist, setSelectedArtist] = useState(null);
   const [selectedSong, setSelectedSong] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem("morchords-admin") === "true");
+  const [showPasswordPopup, setShowPasswordPopup] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
 
   const goToArtist = (artist) => {
     setSelectedArtist(artist);
@@ -331,7 +553,9 @@ export default function App() {
   };
 
   const goBack = () => {
-    if (view === "song") {
+    if (view === "edit-song") {
+      setView("song");
+    } else if (view === "song") {
       setSelectedSong(null);
       setView("songs");
     } else if (view === "songs") {
@@ -342,6 +566,36 @@ export default function App() {
       setView("artists");
       setSearchQuery("");
     }
+  };
+
+  const handleAdminLogin = () => {
+    if (passwordInput === ADMIN_PASSWORD) {
+      setIsAdmin(true);
+      localStorage.setItem("morchords-admin", "true");
+      setShowPasswordPopup(false);
+      setPasswordInput("");
+    } else {
+      setPasswordInput("");
+    }
+  };
+
+  const handleAdminLogout = () => {
+    setIsAdmin(false);
+    localStorage.removeItem("morchords-admin");
+  };
+
+  const handleLogoClick = () => {
+    if (isAdmin) {
+      setView("artists"); setSelectedArtist(null); setSelectedSong(null); setSearchQuery("");
+    } else {
+      setShowPasswordPopup(true);
+    }
+  };
+
+  // קבלת מילים לשיר (עם עריכות מ-localStorage אם יש)
+  const getSongLyrics = (song) => {
+    if (!selectedArtist) return song.lyrics;
+    return getEditedLyrics(selectedArtist.id, song.id) || song.lyrics;
   };
 
   // חיפוש על זמרים ושירים
@@ -401,7 +655,7 @@ export default function App() {
           }}>
             <span style={{ fontSize: 32 }}>🎸</span>
           </div>
-          <h1 onClick={() => { setView("artists"); setSelectedArtist(null); setSelectedSong(null); setSearchQuery(""); }} style={{
+          <h1 onClick={handleLogoClick} style={{
             fontFamily: "'Instrument Serif', serif",
             fontSize: 30, color: "#F5E6D3", fontWeight: 400, letterSpacing: -0.5,
             marginBottom: 4, cursor: "pointer",
@@ -412,7 +666,51 @@ export default function App() {
             fontSize: 13, color: "#F5E6D3", opacity: 0.4, fontWeight: 300,
             letterSpacing: 2, textTransform: "uppercase",
           }}>@morbenbasat</p>
+          {isAdmin && (
+            <div style={{ marginTop: 6 }}>
+              <span style={{ fontSize: 11, color: "#4ECDC4", background: "#4ECDC415", padding: "2px 10px", borderRadius: 10, fontFamily: "'Heebo', sans-serif" }}>מצב עריכה</span>
+              <button onClick={handleAdminLogout} style={{
+                background: "none", border: "none", color: "#ff6666", fontSize: 11,
+                cursor: "pointer", fontFamily: "'Heebo', sans-serif", marginRight: 8, opacity: 0.6,
+              }}>יציאה</button>
+            </div>
+          )}
         </div>
+
+        {/* פופאפ סיסמה */}
+        {showPasswordPopup && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,0.7)", zIndex: 1000,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }} onClick={() => { setShowPasswordPopup(false); setPasswordInput(""); }}>
+            <div onClick={e => e.stopPropagation()} style={{
+              background: "#1e1e3a", borderRadius: 18, padding: "30px 28px",
+              border: "1px solid #ffffff15", width: 300, textAlign: "center",
+            }}>
+              <p style={{ color: "#F5E6D3", fontFamily: "'Heebo', sans-serif", fontSize: 16, fontWeight: 600, marginBottom: 16, direction: "rtl" }}>כניסת מנהל</p>
+              <input
+                type="password"
+                placeholder="סיסמה..."
+                value={passwordInput}
+                onChange={e => setPasswordInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleAdminLogin()}
+                autoFocus
+                style={{
+                  width: "100%", padding: "12px 16px", borderRadius: 10,
+                  border: "1px solid #ffffff15", background: "#ffffff08",
+                  color: "#F5E6D3", fontSize: 15, fontFamily: "'Heebo', sans-serif",
+                  direction: "rtl", outline: "none", textAlign: "center", marginBottom: 12,
+                }}
+              />
+              <button onClick={handleAdminLogin} style={{
+                width: "100%", background: "#FF6B35", border: "none", borderRadius: 10,
+                padding: "10px", color: "#1A1A2E", fontSize: 14,
+                fontFamily: "'Heebo', sans-serif", fontWeight: 700, cursor: "pointer",
+              }}>כניסה</button>
+            </div>
+          </div>
+        )}
 
         {/* === מסך זמרים === */}
         {view === "artists" && (
@@ -441,23 +739,52 @@ export default function App() {
               />
             </div>
 
-            {/* כפתור מילון אקורדים */}
-            <div style={{ textAlign: "center", marginBottom: 20 }}>
-              <button onClick={() => { setSearchQuery(""); setView("chords"); }} style={{
-                background: "linear-gradient(135deg, #FF6B3518, #FF6B3508)",
-                border: "1px solid #FF6B3530",
-                borderRadius: 14, padding: "12px 24px",
-                cursor: "pointer", color: "#FF6B35",
-                fontSize: 15, fontFamily: "'Heebo', sans-serif", fontWeight: 600,
-                transition: "all 0.25s ease", direction: "rtl",
-                display: "inline-flex", alignItems: "center", gap: 8,
-              }}
-                onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg, #FF6B3528, #FF6B3518)"; e.currentTarget.style.borderColor = "#FF6B3560"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg, #FF6B3518, #FF6B3508)"; e.currentTarget.style.borderColor = "#FF6B3530"; }}
-              >
-                🎸 מילון אקורדים
-              </button>
+            {/* שיעורי גיטרה */}
+            <div style={{
+              background: "linear-gradient(135deg, #FF6B3514, #FF6B3508)",
+              border: "1px solid #FF6B3530",
+              borderRadius: 18, padding: "20px 22px", marginBottom: 16,
+              direction: "rtl", display: "flex", alignItems: "center", gap: 18,
+            }}>
+              <div style={{ flex: 1 }}>
+                <h3 style={{
+                  fontFamily: "'Heebo', sans-serif", color: "#F5E6D3",
+                  fontSize: 19, fontWeight: 800, margin: "0 0 4px",
+                }}>שיעורי גיטרה למתחילים</h3>
+                <p style={{
+                  fontFamily: "'Heebo', sans-serif", color: "#F5E6D3",
+                  opacity: 0.55, fontSize: 13, margin: "0 0 12px",
+                }}>למדו לנגן את השירים האהובים עליכם מאפס!</p>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <a href="tel:0542550950" style={{
+                    background: "#FF6B35", color: "#1A1A2E", textDecoration: "none",
+                    borderRadius: 10, padding: "8px 16px", fontSize: 14,
+                    fontFamily: "'Heebo', sans-serif", fontWeight: 700,
+                    direction: "ltr", display: "inline-block",
+                  }}>054-255-0950</a>
+                  <a href="mailto:morbb1231@gmail.com" style={{
+                    background: "#FF6B3520", color: "#FF6B35", textDecoration: "none",
+                    borderRadius: 10, padding: "8px 16px", fontSize: 13,
+                    fontFamily: "'Instrument Serif', serif", border: "1px solid #FF6B3540",
+                    display: "inline-block",
+                  }}>morbb1231@gmail.com</a>
+                </div>
+              </div>
+              <div style={{
+                fontSize: 42, width: 70, textAlign: "center", flexShrink: 0,
+              }}>🎸</div>
             </div>
+
+            {/* כפתור מילון אקורדים */}
+            <button onClick={() => { setSearchQuery(""); setView("chords"); }} style={{
+              width: "100%", background: "#ffffff06", border: "1px solid #ffffff0a",
+              borderRadius: 14, padding: "16px", cursor: "pointer", marginBottom: 16,
+              color: "#F5E6D3", fontFamily: "'Heebo', sans-serif", fontSize: 16,
+              fontWeight: 600, transition: "all 0.25s ease", textAlign: "center",
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#ffffff0c"; e.currentTarget.style.borderColor = "#FF6B3530"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "#ffffff06"; e.currentTarget.style.borderColor = "#ffffff0a"; }}
+            >🎸 מילון אקורדים</button>
 
             {/* רשימת זמרים */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, paddingBottom: 30 }}>
@@ -508,7 +835,26 @@ export default function App() {
 
         {/* === מסך שיר === */}
         {view === "song" && selectedSong && selectedArtist && (
-          <SongView song={selectedSong} artist={selectedArtist} onBack={goBack} />
+          <SongView
+            song={{ ...selectedSong, lyrics: getSongLyrics(selectedSong) }}
+            artist={selectedArtist}
+            onBack={goBack}
+            isAdmin={isAdmin}
+            onEdit={() => setView("edit-song")}
+          />
+        )}
+
+        {/* === מסך עריכת שיר === */}
+        {view === "edit-song" && selectedSong && selectedArtist && (
+          <SongEditor
+            song={{ ...selectedSong, lyrics: getSongLyrics(selectedSong) }}
+            artist={selectedArtist}
+            onSave={(newLyrics) => {
+              saveEditedLyrics(selectedArtist.id, selectedSong.id, newLyrics);
+              setView("song");
+            }}
+            onCancel={() => setView("song")}
+          />
         )}
 
         {/* === מסך מילון אקורדים === */}

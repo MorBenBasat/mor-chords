@@ -33,8 +33,13 @@ export const CHORD_DB = {
   Dm7: { fingers: [[1,1],[2,1],[3,2]], barres: [], muted: [5,6], open: [4] },
   Em7: { fingers: [[4,2]], barres: [], muted: [], open: [1,2,3,5,6] },
 
+  // Sharp
+  "F#": { fingers: [[2,3],[3,3],[4,4]], barres: [{from:1,to:6,fret:2}], muted: [], open: [] },
+  "F#m": { fingers: [[3,3],[4,4]], barres: [{from:1,to:6,fret:2}], muted: [], open: [] },
+
   // Sus
   Dsus4: { fingers: [[1,3],[2,3],[3,2]], barres: [], muted: [5,6], open: [4] },
   Asus4: { fingers: [[2,2],[3,3],[4,2]], barres: [], muted: [6], open: [1,5] },
   Esus4: { fingers: [[3,2],[4,2],[5,2]], barres: [], muted: [], open: [1,2,6] },
+  Bsus4: { fingers: [[2,4],[3,4],[4,5]], barres: [{from:1,to:5,fret:2}], muted: [6], open: [] },
 };
