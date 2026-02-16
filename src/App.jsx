@@ -62,7 +62,7 @@ function lyricsToWordLines(lyrics) {
       if (seg.match(/^\s+$/)) { charIdx += seg.length; continue; }
       if (seg === "") continue;
       const chord = chordPositions.find(cp => cp.pos >= charIdx && cp.pos <= charIdx + seg.length);
-      words.push({ word: seg, chord: chord ? chord.chord : null });
+      words.push({ word: seg, chord: chord ? chord.chord : null, chordPos: chord ? chord.pos - charIdx : 0 });
       charIdx += seg.length + 1;
     }
     return words;
@@ -73,11 +73,32 @@ function lyricsToWordLines(lyrics) {
 function wordLinesToLyrics(lines) {
   return lines.map(words => {
     if (words.length === 0) return "";
-    return words.map(w => (w.chord ? `[${w.chord}]` : "") + w.word).join(" ");
+    return words.map(w => {
+      if (!w.chord) return w.word;
+      const pos = w.chordPos || 0;
+      return w.word.slice(0, pos) + `[${w.chord}]` + w.word.slice(pos);
+    }).join(" ");
   }).join("\n");
 }
 
 const ADMIN_PASSWORD = "mor2024";
+
+// תמונת זמר — תומך באימוג'י או URL של תמונה
+function ArtistImage({ image, color, size = 56 }) {
+  const isUrl = image && (image.startsWith("/") || image.startsWith("http"));
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: size * 0.28,
+      background: isUrl ? "none" : `linear-gradient(135deg, ${color}, ${color}80)`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: size * 0.5, overflow: "hidden", flexShrink: 0,
+    }}>
+      {isUrl
+        ? <img src={image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: size * 0.28 }} />
+        : image}
+    </div>
+  );
+}
 
 // ===== קומפוננטות =====
 
@@ -148,12 +169,9 @@ function ArtistCard({ artist, onClick, index }) {
       onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px) scale(1.03)"; e.currentTarget.style.borderColor = artist.color + "60"; }}
       onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0) scale(1)"; e.currentTarget.style.borderColor = artist.color + "30"; }}
     >
-      <div style={{
-        width: 56, height: 56, borderRadius: 16,
-        background: `linear-gradient(135deg, ${artist.color}, ${artist.color}80)`,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 28, margin: "0 auto 10px",
-      }}>{artist.image}</div>
+      <div style={{ margin: "0 auto 10px" }}>
+        <ArtistImage image={artist.image} color={artist.color} size={56} />
+      </div>
       <div style={{ fontSize: 14, fontWeight: 700, color: "#F5E6D3", fontFamily: "'Heebo', sans-serif", marginBottom: 3, direction: "rtl" }}>{artist.name}</div>
       <div style={{ fontSize: 12, color: "#F5E6D3", opacity: 0.4, fontFamily: "'Heebo', sans-serif" }}>
         {songCount} {songCount === 1 ? "שיר" : "שירים"}
@@ -162,59 +180,61 @@ function ArtistCard({ artist, onClick, index }) {
   );
 }
 
-// כרטיס שיר
-function SongCard({ song, color, onClick, index }) {
+// כרטיס שיר — גריד 3 בשורה
+function SongCard({ song, color, onClick, index, subtitle }) {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setVisible(true), index * 80);
+    const t = setTimeout(() => setVisible(true), index * 60);
     return () => clearTimeout(t);
   }, [index]);
 
-  const chords = extractChords(song.lyrics);
+  const diffColor = song.difficulty === "קל" ? "#4ECDC4" : song.difficulty === "קשה" ? "#ff6666" : "#FFB74D";
+  const diffEmoji = song.difficulty === "קל" ? "🟢" : song.difficulty === "קשה" ? "🔴" : "🟡";
 
   return (
     <div onClick={onClick} style={{
-      background: `linear-gradient(135deg, ${color}12, ${color}06)`,
-      border: `1px solid ${color}25`,
-      borderRadius: 14,
-      padding: "16px 20px",
+      background: `linear-gradient(145deg, ${color}20, ${color}0a)`,
+      border: `1.5px solid ${color}35`,
+      borderRadius: 20,
+      padding: "28px 14px 22px",
       cursor: "pointer",
       transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
       opacity: visible ? 1 : 0,
       transform: visible ? "translateY(0)" : "translateY(15px)",
       direction: "rtl",
+      textAlign: "center",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 10,
+      minHeight: 130,
+      position: "relative",
+      overflow: "hidden",
     }}
-      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = color + "50"; }}
-      onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = color + "25"; }}
+      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-5px) scale(1.05)"; e.currentTarget.style.borderColor = color + "70"; e.currentTarget.style.boxShadow = `0 12px 32px ${color}25`; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0) scale(1)"; e.currentTarget.style.borderColor = color + "35"; e.currentTarget.style.boxShadow = "none"; }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: "#F5E6D3", fontFamily: "'Heebo', sans-serif", marginBottom: 4 }}>{song.title}</div>
-          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-            {chords.slice(0, 5).map(c => (
-              <span key={c} style={{
-                background: color + "20",
-                color: color,
-                padding: "2px 8px",
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                fontFamily: "'Instrument Serif', serif",
-              }}>{c}</span>
-            ))}
-          </div>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-          <span style={{
-            fontSize: 11,
-            color: song.difficulty === "קל" ? "#4ECDC4" : "#FFB74D",
-            background: song.difficulty === "קל" ? "#4ECDC420" : "#FFB74D20",
-            padding: "2px 10px",
-            borderRadius: 20,
-            fontFamily: "'Heebo', sans-serif",
-          }}>{song.difficulty}</span>
-        </div>
-      </div>
+      <div style={{
+        position: "absolute", top: -25, left: -25, width: 80, height: 80,
+        borderRadius: "50%", background: `${color}0c`, pointerEvents: "none",
+      }} />
+      <div style={{
+        position: "absolute", bottom: -15, right: -15, width: 50, height: 50,
+        borderRadius: "50%", background: `${color}06`, pointerEvents: "none",
+      }} />
+      <div style={{ fontSize: 17, fontWeight: 800, color: "#F5E6D3", fontFamily: "'Heebo', sans-serif", lineHeight: 1.4, zIndex: 1 }}>{song.title}</div>
+      {subtitle && <div style={{ fontSize: 12, color: "#F5E6D3", opacity: 0.55, fontFamily: "'Heebo', sans-serif", marginTop: -6, zIndex: 1 }}>{subtitle}</div>}
+      <span style={{
+        fontSize: 12,
+        color: diffColor,
+        background: diffColor + "20",
+        padding: "4px 14px",
+        borderRadius: 20,
+        fontFamily: "'Heebo', sans-serif",
+        fontWeight: 700,
+        zIndex: 1,
+      }}>{diffEmoji} {song.difficulty}</span>
     </div>
   );
 }
@@ -237,12 +257,9 @@ function SongView({ song, artist, onBack, isAdmin, onEdit, chordDB = {} }) {
 
       {/* כותרת */}
       <div style={{ textAlign: "center", direction: "rtl", marginBottom: 30 }}>
-        <div style={{
-          width: 56, height: 56, borderRadius: 14,
-          background: `linear-gradient(135deg, ${artist.color}, ${artist.color}80)`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          margin: "0 auto 14px", fontSize: 26,
-        }}>{artist.image}</div>
+        <div style={{ margin: "0 auto 14px", display: "flex", justifyContent: "center" }}>
+          <ArtistImage image={artist.image} color={artist.color} size={56} />
+        </div>
         <h2 style={{ fontFamily: "'Heebo', sans-serif", color: "#F5E6D3", fontSize: 24, margin: 0, fontWeight: 700 }}>{song.title}</h2>
         <p style={{ fontFamily: "'Heebo', sans-serif", color: "#F5E6D3", opacity: 0.5, margin: "4px 0 0", fontSize: 15 }}>{artist.name}</p>
         <span style={{
@@ -261,30 +278,6 @@ function SongView({ song, artist, onBack, isAdmin, onEdit, chordDB = {} }) {
         )}
       </div>
 
-      {/* פרטי קשר */}
-      <a href="tel:0542550950" style={{
-        display: "block", marginBottom: 20, padding: "18px 22px",
-        background: "linear-gradient(135deg, #FF6B3518, #FF6B3508)",
-        border: "1px solid #FF6B3535",
-        borderRadius: 16, textDecoration: "none",
-        direction: "rtl", textAlign: "center",
-        transition: "all 0.3s ease",
-      }}
-        onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg, #FF6B3525, #FF6B3512)"; e.currentTarget.style.borderColor = "#FF6B3550"; }}
-        onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg, #FF6B3518, #FF6B3508)"; e.currentTarget.style.borderColor = "#FF6B3535"; }}
-      >
-        <p style={{ fontFamily: "'Heebo', sans-serif", color: "#F5E6D3", fontSize: 16, fontWeight: 800, margin: "0 0 6px" }}>
-          🎸 מור בן בסט — שיעורי גיטרה
-        </p>
-        <span style={{
-          display: "inline-block", background: "#FF6B35", color: "#1A1A2E",
-          borderRadius: 10, padding: "6px 20px", fontSize: 15,
-          fontFamily: "'Heebo', sans-serif", fontWeight: 700,
-          direction: "ltr",
-        }}>054-255-0950</span>
-        <p style={{ fontFamily: "'Heebo', sans-serif", color: "#F5E6D3", opacity: 0.35, fontSize: 11, margin: "6px 0 0", direction: "ltr" }}>morbb1231@gmail.com</p>
-      </a>
-
       {/* מילים + אקורדים */}
       <div style={{
         background: "#ffffff06", borderRadius: 18, padding: "24px 20px",
@@ -299,7 +292,7 @@ function SongView({ song, artist, onBack, isAdmin, onEdit, chordDB = {} }) {
           return (
             <div key={i} style={{ marginBottom: hasChords ? 6 : 4, direction: "rtl" }}>
               {hasChords ? (
-                <div style={{ display: "inline" }}>
+                <div style={{ direction: "rtl", textAlign: "right" }}>
                   {parts.map((part, j) => (
                     <span key={j} style={{ display: "inline-block", verticalAlign: "top", position: "relative" }}
                       onMouseEnter={part.chord ? () => setHoveredChord(`${i}-${j}`) : undefined}
@@ -335,6 +328,7 @@ function SongView({ song, artist, onBack, isAdmin, onEdit, chordDB = {} }) {
                         padding: "0 2px",
                         borderRadius: 4,
                         direction: "ltr",
+                        textAlign: "right",
                         background: part.chord && hoveredChord === `${i}-${j}` ? artist.color + "25" : "transparent",
                         transition: "background 0.2s ease",
                       }}>{part.chord || "\u00A0"}</span>
@@ -388,11 +382,13 @@ function SongEditor({ song, artist, onSave, onCancel, chordDB = {} }) {
   const [dragOverTarget, setDragOverTarget] = useState(null);
   const allChords = Object.keys(chordDB);
 
-  const handleDrop = (lineIdx, wordIdx) => {
+  const handleDrop = (e, lineIdx, wordIdx) => {
     if (!draggedChord) return;
+    const charPos = dragOverTarget ? dragOverTarget.charPos : 0;
     setEditLines(prev => {
       const next = prev.map(l => l.map(w => ({ ...w })));
       next[lineIdx][wordIdx].chord = draggedChord;
+      next[lineIdx][wordIdx].chordPos = charPos;
       return next;
     });
     setDraggedChord(null);
@@ -469,20 +465,29 @@ function SongEditor({ song, artist, onSave, onCancel, chordDB = {} }) {
           return (
             <div key={lineIdx} style={{ marginBottom: 10, display: "flex", flexWrap: "wrap", gap: 4 }}>
               {words.map((w, wordIdx) => {
-                const isOver = dragOverTarget === `${lineIdx}-${wordIdx}`;
+                const isOver = dragOverTarget && dragOverTarget.line === lineIdx && dragOverTarget.word === wordIdx;
+                const dropCharPos = isOver ? dragOverTarget.charPos : null;
+                const chordPos = w.chordPos || 0;
                 return (
                   <div
                     key={wordIdx}
-                    onDragOver={e => { e.preventDefault(); setDragOverTarget(`${lineIdx}-${wordIdx}`); }}
+                    onDragOver={e => {
+                      e.preventDefault();
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const relX = rect.right - e.clientX;
+                      const charWidth = rect.width / Math.max(w.word.length, 1);
+                      const cp = Math.min(Math.max(Math.round(relX / charWidth), 0), w.word.length);
+                      setDragOverTarget({ line: lineIdx, word: wordIdx, charPos: cp });
+                    }}
                     onDragLeave={() => setDragOverTarget(null)}
-                    onDrop={e => { e.preventDefault(); handleDrop(lineIdx, wordIdx); }}
+                    onDrop={e => { e.preventDefault(); handleDrop(e, lineIdx, wordIdx); }}
                     style={{
-                      display: "inline-flex", flexDirection: "column", alignItems: "center",
+                      display: "inline-flex", flexDirection: "column", alignItems: "flex-start",
                       padding: "2px 4px", borderRadius: 6,
-                      background: isOver ? artist.color + "25" : "transparent",
+                      background: isOver ? artist.color + "15" : "transparent",
                       border: isOver ? `1.5px dashed ${artist.color}` : "1.5px dashed transparent",
-                      transition: "all 0.15s ease",
-                      minWidth: 30,
+                      transition: "background 0.15s ease, border 0.15s ease",
+                      minWidth: 30, position: "relative",
                     }}
                   >
                     <span
@@ -496,12 +501,30 @@ function SongEditor({ song, artist, onSave, onCancel, chordDB = {} }) {
                         cursor: w.chord ? "grab" : "default",
                         userSelect: "none",
                         direction: "ltr",
+                        alignSelf: w.chord && chordPos > 0
+                          ? "flex-end"
+                          : "flex-start",
+                        marginLeft: w.chord && chordPos > 0
+                          ? `${Math.round((1 - chordPos / Math.max(w.word.length, 1)) * 100)}%`
+                          : undefined,
                       }}
                     >{w.chord || "\u00A0"}</span>
                     <span style={{
                       color: "#F5E6D3", fontSize: 15,
                       fontFamily: "'Heebo', sans-serif",
-                    }}>{w.word}</span>
+                      direction: "rtl",
+                    }}>
+                      {isOver && dropCharPos !== null ? (
+                        <>
+                          <span>{w.word.slice(0, dropCharPos)}</span>
+                          <span style={{
+                            borderLeft: `2px solid ${artist.color}`,
+                            marginLeft: 1, marginRight: 1,
+                          }}></span>
+                          <span>{w.word.slice(dropCharPos)}</span>
+                        </>
+                      ) : w.word}
+                    </span>
                   </div>
                 );
               })}
@@ -570,10 +593,41 @@ export default function App() {
         chordMap[c.name] = { fingers: c.fingers, barres: c.barres, muted: c.muted, open: c.open };
       }
       setChordDB(chordMap);
+
+      // Restore navigation state after refresh
+      try {
+        const saved = JSON.parse(localStorage.getItem("morchords-nav") || "null");
+        if (saved) {
+          const artist = artistsList.find(a => a.id === saved.artistId);
+          if (saved.view === "songs" && artist) {
+            setSelectedArtist(artist);
+            setView("songs");
+          } else if ((saved.view === "song" || saved.view === "edit-song") && artist) {
+            const song = artist.songs.find(s => s.id === saved.songId);
+            if (song) {
+              setSelectedArtist(artist);
+              setSelectedSong(song);
+              setView("song");
+            }
+          } else if (saved.view === "chords" || saved.view === "easy-songs") {
+            setView(saved.view);
+          }
+        }
+      } catch (e) {}
+
       setLoading(false);
     }
     loadData();
   }, []);
+
+  // Save navigation state to localStorage
+  useEffect(() => {
+    localStorage.setItem("morchords-nav", JSON.stringify({
+      view,
+      artistId: selectedArtist?.id || null,
+      songId: selectedSong?.id || null,
+    }));
+  }, [view, selectedArtist, selectedSong]);
 
   const goToArtist = (artist) => {
     setSelectedArtist(artist);
@@ -778,42 +832,6 @@ export default function App() {
               />
             </div>
 
-            {/* שיעורי גיטרה */}
-            <div style={{
-              background: "linear-gradient(135deg, #FF6B3514, #FF6B3508)",
-              border: "1px solid #FF6B3530",
-              borderRadius: 18, padding: "20px 22px", marginBottom: 16,
-              direction: "rtl", display: "flex", alignItems: "center", gap: 18,
-            }}>
-              <div style={{ flex: 1 }}>
-                <h3 style={{
-                  fontFamily: "'Heebo', sans-serif", color: "#F5E6D3",
-                  fontSize: 19, fontWeight: 800, margin: "0 0 4px",
-                }}>שיעורי גיטרה למתחילים</h3>
-                <p style={{
-                  fontFamily: "'Heebo', sans-serif", color: "#F5E6D3",
-                  opacity: 0.55, fontSize: 13, margin: "0 0 12px",
-                }}>למדו לנגן את השירים האהובים עליכם מאפס!</p>
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <a href="tel:0542550950" style={{
-                    background: "#FF6B35", color: "#1A1A2E", textDecoration: "none",
-                    borderRadius: 10, padding: "8px 16px", fontSize: 14,
-                    fontFamily: "'Heebo', sans-serif", fontWeight: 700,
-                    direction: "ltr", display: "inline-block",
-                  }}>054-255-0950</a>
-                  <a href="mailto:morbb1231@gmail.com" style={{
-                    background: "#FF6B3520", color: "#FF6B35", textDecoration: "none",
-                    borderRadius: 10, padding: "8px 16px", fontSize: 13,
-                    fontFamily: "'Instrument Serif', serif", border: "1px solid #FF6B3540",
-                    display: "inline-block",
-                  }}>morbb1231@gmail.com</a>
-                </div>
-              </div>
-              <div style={{
-                fontSize: 42, width: 70, textAlign: "center", flexShrink: 0,
-              }}>🎸</div>
-            </div>
-
             {/* כפתור מילון אקורדים */}
             <button onClick={() => { setSearchQuery(""); setView("chords"); }} style={{
               width: "100%", background: "#ffffff06", border: "1px solid #ffffff0a",
@@ -848,6 +866,7 @@ export default function App() {
                 </div>
               )}
             </div>
+
           </div>
         )}
 
@@ -863,22 +882,48 @@ export default function App() {
             </button>
 
             <div style={{ textAlign: "center", direction: "rtl", marginBottom: 24 }}>
-              <div style={{
-                width: 64, height: 64, borderRadius: 16,
-                background: `linear-gradient(135deg, ${selectedArtist.color}, ${selectedArtist.color}80)`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                margin: "0 auto 12px", fontSize: 30,
-              }}>{selectedArtist.image}</div>
+              <div style={{ margin: "0 auto 12px", display: "flex", justifyContent: "center" }}>
+                <ArtistImage image={selectedArtist.image} color={selectedArtist.color} size={64} />
+              </div>
               <h2 style={{ fontFamily: "'Heebo', sans-serif", color: "#F5E6D3", fontSize: 22, fontWeight: 700, margin: 0 }}>{selectedArtist.name}</h2>
               <p style={{ fontSize: 13, color: "#F5E6D3", opacity: 0.4, marginTop: 4 }}>
                 {selectedArtist.songs.length} {selectedArtist.songs.length === 1 ? "שיר" : "שירים"}
               </p>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingBottom: 30 }}>
-              {selectedArtist.songs.map((song, i) => (
-                <SongCard key={song.id} song={song} color={selectedArtist.color} index={i} onClick={() => goToSong(song)} />
+            {/* חיפוש שיר */}
+            {selectedArtist.songs.length > 3 && (
+              <div style={{ marginBottom: 16 }}>
+                <input
+                  type="text"
+                  placeholder="🔍 חיפוש שיר..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  style={{
+                    width: "100%", padding: "12px 16px", borderRadius: 14,
+                    border: "1px solid #ffffff12", background: "#ffffff08",
+                    color: "#F5E6D3", fontSize: 14, fontFamily: "'Heebo', sans-serif",
+                    direction: "rtl", outline: "none",
+                    transition: "border-color 0.25s ease",
+                  }}
+                  onFocus={e => e.target.style.borderColor = selectedArtist.color + "50"}
+                  onBlur={e => e.target.style.borderColor = "#ffffff12"}
+                />
+              </div>
+            )}
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, paddingBottom: 30 }}>
+              {selectedArtist.songs
+                .filter(s => !searchQuery || s.title.includes(searchQuery) || extractChords(s.lyrics).some(c => c.toLowerCase().includes(searchQuery.toLowerCase())))
+                .map((song, i) => (
+                  <SongCard key={song.id} song={song} color={selectedArtist.color} index={i} onClick={() => goToSong(song)} />
               ))}
+              {selectedArtist.songs.filter(s => !searchQuery || s.title.includes(searchQuery)).length === 0 && (
+                <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: 40, color: "#F5E6D3", opacity: 0.3, direction: "rtl" }}>
+                  <span style={{ fontSize: 40, display: "block", marginBottom: 12 }}>🎵</span>
+                  לא נמצאו שירים
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -905,34 +950,40 @@ export default function App() {
               <p style={{ fontSize: 13, color: "#F5E6D3", opacity: 0.4, marginTop: 4 }}>שירים מומלצים למתחילים</p>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingBottom: 30 }}>
-              {artists.flatMap(a => a.songs.filter(s => s.difficulty === "קל").map(song => {
-                const artist = a;
-                return (
-                  <div key={`${artist.id}-${song.id}`} onClick={() => { setSelectedArtist(artist); goToSong(song); }} style={{
-                    background: `linear-gradient(135deg, ${artist.color}12, ${artist.color}06)`,
-                    border: `1px solid ${artist.color}25`,
-                    borderRadius: 14, padding: "16px 20px", cursor: "pointer",
-                    transition: "all 0.3s ease", direction: "rtl",
-                  }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = artist.color + "50"; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = artist.color + "25"; }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
-                        <div style={{ fontSize: 16, fontWeight: 600, color: "#F5E6D3", fontFamily: "'Heebo', sans-serif", marginBottom: 4 }}>{song.title}</div>
-                        <div style={{ fontSize: 13, color: "#F5E6D3", opacity: 0.5, fontFamily: "'Heebo', sans-serif" }}>{artist.name}</div>
-                      </div>
-                      <span style={{
-                        fontSize: 11, color: "#4ECDC4", background: "#4ECDC420",
-                        padding: "2px 10px", borderRadius: 20, fontFamily: "'Heebo', sans-serif",
-                      }}>קל</span>
-                    </div>
-                  </div>
-                );
-              }))}
+            {/* חיפוש שיר קל */}
+            <div style={{ marginBottom: 16 }}>
+              <input
+                type="text"
+                placeholder="🔍 חיפוש שיר..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{
+                  width: "100%", padding: "12px 16px", borderRadius: 14,
+                  border: "1px solid #ffffff12", background: "#ffffff08",
+                  color: "#F5E6D3", fontSize: 14, fontFamily: "'Heebo', sans-serif",
+                  direction: "rtl", outline: "none",
+                  transition: "border-color 0.25s ease",
+                }}
+                onFocus={e => e.target.style.borderColor = "#4ECDC450"}
+                onBlur={e => e.target.style.borderColor = "#ffffff12"}
+              />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, paddingBottom: 30 }}>
+              {artists.flatMap(a => a.songs.filter(s => s.difficulty === "קל").map(song => ({ song, artist: a })))
+                .filter(({ song, artist }) => !searchQuery || song.title.includes(searchQuery) || artist.name.includes(searchQuery))
+                .map(({ song, artist }, i) => (
+                  <SongCard
+                    key={`${artist.id}-${song.id}`}
+                    song={song}
+                    color={artist.color}
+                    index={i}
+                    subtitle={artist.name}
+                    onClick={() => { setSelectedArtist(artist); goToSong(song); }}
+                  />
+              ))}
               {artists.flatMap(a => a.songs.filter(s => s.difficulty === "קל")).length === 0 && (
-                <div style={{ textAlign: "center", padding: 40, color: "#F5E6D3", opacity: 0.3, direction: "rtl" }}>
+                <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: 40, color: "#F5E6D3", opacity: 0.3, direction: "rtl" }}>
                   <span style={{ fontSize: 40, display: "block", marginBottom: 12 }}>🎵</span>
                   אין שירים קלים עדיין
                 </div>
@@ -1097,7 +1148,7 @@ export default function App() {
 
         {/* Footer */}
         <div style={{
-          textAlign: "center", padding: "30px 0 40px",
+          textAlign: "center", padding: "30px 0 80px",
           borderTop: "1px solid #ffffff08",
         }}>
           <p style={{ fontSize: 11, color: "#F5E6D3", opacity: 0.2, fontFamily: "'Instrument Serif', serif" }}>
@@ -1105,6 +1156,40 @@ export default function App() {
           </p>
         </div>
       </div>
+      )}
+
+      {/* בר תחתון קבוע — פרטי קשר */}
+      {!loading && (
+        <div style={{
+          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 900,
+          background: "linear-gradient(135deg, #1A1A2E, #0F3460)",
+          borderTop: "2px solid #FF6B35",
+          padding: "10px 20px",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          gap: 10,
+          boxShadow: "0 -4px 20px rgba(0,0,0,0.5)",
+        }}>
+          <span style={{
+            fontFamily: "'Heebo', sans-serif", color: "#F5E6D3",
+            fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
+          }}>מור בן בסט</span>
+          <a href="tel:0542550950" style={{
+            background: "#FF6B35", color: "#1A1A2E", textDecoration: "none",
+            borderRadius: 8, padding: "6px 14px", fontSize: 13,
+            fontFamily: "'Heebo', sans-serif", fontWeight: 800,
+            direction: "ltr", whiteSpace: "nowrap",
+          }}>054-255-0950</a>
+          <a href="mailto:morbb1231@gmail.com" style={{
+            color: "#F5E6D3", textDecoration: "none", opacity: 0.7,
+            fontSize: 11, fontFamily: "'Heebo', sans-serif",
+            direction: "ltr", whiteSpace: "nowrap",
+          }}>morbb1231@gmail.com</a>
+          <a href="https://www.tiktok.com/@morbenbasat" target="_blank" rel="noopener noreferrer" style={{
+            color: "#FF6B35", textDecoration: "none",
+            fontSize: 12, fontFamily: "'Heebo', sans-serif", fontWeight: 600,
+            direction: "ltr", whiteSpace: "nowrap",
+          }}>TikTok</a>
+        </div>
       )}
     </div>
   );

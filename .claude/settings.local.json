@@ -17,7 +17,9 @@
       "Bash(npm run dev:*)",
       "mcp__plugin_playwright_playwright__browser_run_code",
       "mcp__plugin_supabase_supabase__list_tables",
-      "Bash(where:*)"
+      "Bash(where:*)",
+      "Bash(node:*)",
+      "Bash(npm run build:*)"
     ]
   }
 }
