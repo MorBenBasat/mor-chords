@@ -15,7 +15,9 @@
       "mcp__plugin_playwright_playwright__browser_wait_for",
       "mcp__plugin_playwright_playwright__browser_take_screenshot",
       "Bash(npm run dev:*)",
-      "mcp__plugin_playwright_playwright__browser_run_code"
+      "mcp__plugin_playwright_playwright__browser_run_code",
+      "mcp__plugin_supabase_supabase__list_tables",
+      "Bash(where:*)"
     ]
   }
 }

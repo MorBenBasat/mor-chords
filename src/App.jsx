@@ -5,7 +5,7 @@ import { supabase } from "./supabaseClient";
 
 // שליפת כל האקורדים מתוך טקסט מילים
 function extractChords(lyrics) {
-  const matches = lyrics.match(/\[([A-Za-z0-9#]+)\]/g);
+  const matches = lyrics.match(/\[([A-Za-z0-9#\/]+)\]/g);
   if (!matches) return [];
   const unique = [...new Set(matches.map(m => m.slice(1, -1)))];
   return unique;
@@ -14,7 +14,7 @@ function extractChords(lyrics) {
 // פירוק שורת מילים לחלקים של אקורד+טקסט
 function parseLine(line) {
   const parts = [];
-  const regex = /\[([A-Za-z0-9#]+)\]/g;
+  const regex = /\[([A-Za-z0-9#\/]+)\]/g;
   let lastIndex = 0;
   let match;
 
@@ -45,7 +45,7 @@ function lyricsToWordLines(lyrics) {
   return lyrics.trim().split("\n").map(line => {
     if (line.trim() === "") return [];
     const words = [];
-    const regex = /\[([A-Za-z0-9#]+)\]/g;
+    const regex = /\[([A-Za-z0-9#\/]+)\]/g;
     let clean = "";
     let chordPositions = [];
     let lastIdx = 0;
@@ -260,6 +260,30 @@ function SongView({ song, artist, onBack, isAdmin, onEdit, chordDB = {} }) {
           }}>עריכת אקורדים</button>
         )}
       </div>
+
+      {/* פרטי קשר */}
+      <a href="tel:0542550950" style={{
+        display: "block", marginBottom: 20, padding: "18px 22px",
+        background: "linear-gradient(135deg, #FF6B3518, #FF6B3508)",
+        border: "1px solid #FF6B3535",
+        borderRadius: 16, textDecoration: "none",
+        direction: "rtl", textAlign: "center",
+        transition: "all 0.3s ease",
+      }}
+        onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg, #FF6B3525, #FF6B3512)"; e.currentTarget.style.borderColor = "#FF6B3550"; }}
+        onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg, #FF6B3518, #FF6B3508)"; e.currentTarget.style.borderColor = "#FF6B3535"; }}
+      >
+        <p style={{ fontFamily: "'Heebo', sans-serif", color: "#F5E6D3", fontSize: 16, fontWeight: 800, margin: "0 0 6px" }}>
+          🎸 מור בן בסט — שיעורי גיטרה
+        </p>
+        <span style={{
+          display: "inline-block", background: "#FF6B35", color: "#1A1A2E",
+          borderRadius: 10, padding: "6px 20px", fontSize: 15,
+          fontFamily: "'Heebo', sans-serif", fontWeight: 700,
+          direction: "ltr",
+        }}>054-255-0950</span>
+        <p style={{ fontFamily: "'Heebo', sans-serif", color: "#F5E6D3", opacity: 0.35, fontSize: 11, margin: "6px 0 0", direction: "ltr" }}>morbb1231@gmail.com</p>
+      </a>
 
       {/* מילים + אקורדים */}
       <div style={{
@@ -511,7 +535,7 @@ function SongEditor({ song, artist, onSave, onCancel, chordDB = {} }) {
 // ===== אפליקציה ראשית =====
 
 export default function App() {
-  const [view, setView] = useState("artists"); // artists | songs | song | chords | edit-song
+  const [view, setView] = useState("artists"); // artists | songs | song | chords | edit-song | easy-songs
   const [selectedArtist, setSelectedArtist] = useState(null);
   const [selectedSong, setSelectedSong] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -572,7 +596,7 @@ export default function App() {
       setSelectedArtist(null);
       setView("artists");
       setSearchQuery("");
-    } else if (view === "chords") {
+    } else if (view === "chords" || view === "easy-songs") {
       setView("artists");
       setSearchQuery("");
     }
@@ -801,6 +825,17 @@ export default function App() {
               onMouseLeave={e => { e.currentTarget.style.background = "#ffffff06"; e.currentTarget.style.borderColor = "#ffffff0a"; }}
             >🎸 מילון אקורדים</button>
 
+            {/* כפתור שירים קלים */}
+            <button onClick={() => { setSearchQuery(""); setView("easy-songs"); }} style={{
+              width: "100%", background: "#4ECDC410", border: "1px solid #4ECDC425",
+              borderRadius: 14, padding: "16px", cursor: "pointer", marginBottom: 16,
+              color: "#4ECDC4", fontFamily: "'Heebo', sans-serif", fontSize: 16,
+              fontWeight: 600, transition: "all 0.25s ease", textAlign: "center",
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#4ECDC420"; e.currentTarget.style.borderColor = "#4ECDC440"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "#4ECDC410"; e.currentTarget.style.borderColor = "#4ECDC425"; }}
+            >🎵 שירים קלים</button>
+
             {/* רשימת זמרים */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, paddingBottom: 30 }}>
               {filteredArtists.map((artist, i) => (
@@ -844,6 +879,64 @@ export default function App() {
               {selectedArtist.songs.map((song, i) => (
                 <SongCard key={song.id} song={song} color={selectedArtist.color} index={i} onClick={() => goToSong(song)} />
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* === מסך שירים קלים === */}
+        {view === "easy-songs" && (
+          <div style={{ animation: "fadeIn 0.4s ease" }}>
+            <button onClick={goBack} style={{
+              background: "none", border: "none", color: "#F5E6D3", opacity: 0.6,
+              cursor: "pointer", fontSize: 15, fontFamily: "'Heebo', sans-serif",
+              display: "flex", alignItems: "center", gap: 6, marginBottom: 20, padding: 0,
+            }}>
+              → חזרה
+            </button>
+
+            <div style={{ textAlign: "center", direction: "rtl", marginBottom: 24 }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: 16,
+                background: "linear-gradient(135deg, #4ECDC4, #4ECDC480)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                margin: "0 auto 12px", fontSize: 30,
+              }}>🎵</div>
+              <h2 style={{ fontFamily: "'Heebo', sans-serif", color: "#F5E6D3", fontSize: 22, fontWeight: 700, margin: 0 }}>שירים קלים</h2>
+              <p style={{ fontSize: 13, color: "#F5E6D3", opacity: 0.4, marginTop: 4 }}>שירים מומלצים למתחילים</p>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingBottom: 30 }}>
+              {artists.flatMap(a => a.songs.filter(s => s.difficulty === "קל").map(song => {
+                const artist = a;
+                return (
+                  <div key={`${artist.id}-${song.id}`} onClick={() => { setSelectedArtist(artist); goToSong(song); }} style={{
+                    background: `linear-gradient(135deg, ${artist.color}12, ${artist.color}06)`,
+                    border: `1px solid ${artist.color}25`,
+                    borderRadius: 14, padding: "16px 20px", cursor: "pointer",
+                    transition: "all 0.3s ease", direction: "rtl",
+                  }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = artist.color + "50"; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = artist.color + "25"; }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <div style={{ fontSize: 16, fontWeight: 600, color: "#F5E6D3", fontFamily: "'Heebo', sans-serif", marginBottom: 4 }}>{song.title}</div>
+                        <div style={{ fontSize: 13, color: "#F5E6D3", opacity: 0.5, fontFamily: "'Heebo', sans-serif" }}>{artist.name}</div>
+                      </div>
+                      <span style={{
+                        fontSize: 11, color: "#4ECDC4", background: "#4ECDC420",
+                        padding: "2px 10px", borderRadius: 20, fontFamily: "'Heebo', sans-serif",
+                      }}>קל</span>
+                    </div>
+                  </div>
+                );
+              }))}
+              {artists.flatMap(a => a.songs.filter(s => s.difficulty === "קל")).length === 0 && (
+                <div style={{ textAlign: "center", padding: 40, color: "#F5E6D3", opacity: 0.3, direction: "rtl" }}>
+                  <span style={{ fontSize: 40, display: "block", marginBottom: 12 }}>🎵</span>
+                  אין שירים קלים עדיין
+                </div>
+              )}
             </div>
           </div>
         )}
