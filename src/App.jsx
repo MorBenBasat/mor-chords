@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { CHORD_DB } from "./data/chords";
-import { artists } from "./data/artists";
+import { supabase } from "./supabaseClient";
 
 // ===== פונקציות עזר =====
 
@@ -78,38 +77,12 @@ function wordLinesToLyrics(lines) {
   }).join("\n");
 }
 
-// קריאת שיר ערוך מ-localStorage
-function getEditedLyrics(artistId, songId) {
-  try {
-    const data = JSON.parse(localStorage.getItem("morchords-edits") || "{}");
-    return data[`${artistId}-${songId}`] || null;
-  } catch { return null; }
-}
-
-// שמירת שיר ערוך ל-localStorage
-function saveEditedLyrics(artistId, songId, lyrics) {
-  try {
-    const data = JSON.parse(localStorage.getItem("morchords-edits") || "{}");
-    data[`${artistId}-${songId}`] = lyrics;
-    localStorage.setItem("morchords-edits", JSON.stringify(data));
-  } catch {}
-}
-
-// מחיקת שיר ערוך מ-localStorage
-function deleteEditedLyrics(artistId, songId) {
-  try {
-    const data = JSON.parse(localStorage.getItem("morchords-edits") || "{}");
-    delete data[`${artistId}-${songId}`];
-    localStorage.setItem("morchords-edits", JSON.stringify(data));
-  } catch {}
-}
-
 const ADMIN_PASSWORD = "mor2024";
 
 // ===== קומפוננטות =====
 
-function ChordDiagram({ name, size = 120 }) {
-  const chord = CHORD_DB[name];
+function ChordDiagram({ name, size = 120, chordDB = {} }) {
+  const chord = chordDB[name];
   if (!chord) return <div style={{ textAlign: "center", color: "#FF6B35", fontFamily: "'Instrument Serif', serif", fontSize: size * 0.16 }}>{name}</div>;
 
   const w = size;
@@ -247,7 +220,7 @@ function SongCard({ song, color, onClick, index }) {
 }
 
 // תצוגת שיר - מילים עם אקורדים
-function SongView({ song, artist, onBack, isAdmin, onEdit }) {
+function SongView({ song, artist, onBack, isAdmin, onEdit, chordDB = {} }) {
   const [hoveredChord, setHoveredChord] = useState(null);
   const chords = extractChords(song.lyrics);
   const lines = song.lyrics.trim().split("\n");
@@ -323,7 +296,7 @@ function SongView({ song, artist, onBack, isAdmin, onEdit }) {
                           boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
                           pointerEvents: "none",
                         }}>
-                          <ChordDiagram name={part.chord} size={110} />
+                          <ChordDiagram name={part.chord} size={110} chordDB={chordDB} />
                         </div>
                       )}
                       <span style={{
@@ -374,7 +347,7 @@ function SongView({ song, artist, onBack, isAdmin, onEdit }) {
               opacity: 0.8,
               transition: "all 0.25s ease",
             }}>
-              <ChordDiagram name={c} size={90} />
+              <ChordDiagram name={c} size={90} chordDB={chordDB} />
             </div>
           ))}
         </div>
@@ -384,11 +357,11 @@ function SongView({ song, artist, onBack, isAdmin, onEdit }) {
 }
 
 // עורך שיר - גרירת אקורדים למילים
-function SongEditor({ song, artist, onSave, onCancel }) {
+function SongEditor({ song, artist, onSave, onCancel, chordDB = {} }) {
   const [editLines, setEditLines] = useState(() => lyricsToWordLines(song.lyrics));
   const [draggedChord, setDraggedChord] = useState(null);
   const [dragOverTarget, setDragOverTarget] = useState(null);
-  const allChords = Object.keys(CHORD_DB);
+  const allChords = Object.keys(chordDB);
 
   const handleDrop = (lineIdx, wordIdx) => {
     if (!draggedChord) return;
@@ -540,6 +513,38 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem("morchords-admin") === "true");
   const [showPasswordPopup, setShowPasswordPopup] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
+  const [selectedChord, setSelectedChord] = useState(null);
+
+  // Data from Supabase
+  const [artists, setArtists] = useState([]);
+  const [CHORD_DB, setChordDB] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      const [artistsRes, songsRes, chordsRes] = await Promise.all([
+        supabase.from("artists").select("*").order("created_at"),
+        supabase.from("songs").select("*"),
+        supabase.from("chords").select("*"),
+      ]);
+
+      // Build artists with nested songs
+      const artistsList = (artistsRes.data || []).map(a => ({
+        ...a,
+        songs: (songsRes.data || []).filter(s => s.artist_id === a.id),
+      }));
+      setArtists(artistsList);
+
+      // Build chord DB as object keyed by name
+      const chordMap = {};
+      for (const c of chordsRes.data || []) {
+        chordMap[c.name] = { fingers: c.fingers, barres: c.barres, muted: c.muted, open: c.open };
+      }
+      setChordDB(chordMap);
+      setLoading(false);
+    }
+    loadData();
+  }, []);
 
   const goToArtist = (artist) => {
     setSelectedArtist(artist);
@@ -592,10 +597,9 @@ export default function App() {
     }
   };
 
-  // קבלת מילים לשיר (עם עריכות מ-localStorage אם יש)
+  // קבלת מילים לשיר
   const getSongLyrics = (song) => {
-    if (!selectedArtist) return song.lyrics;
-    return getEditedLyrics(selectedArtist.id, song.id) || song.lyrics;
+    return song.lyrics;
   };
 
   // חיפוש על זמרים ושירים
@@ -641,6 +645,12 @@ export default function App() {
         animation: "pulse 8s ease infinite 2s", pointerEvents: "none",
       }} />
 
+      {loading ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", flexDirection: "column", gap: 16 }}>
+          <span style={{ fontSize: 48, animation: "float 2s ease-in-out infinite" }}>🎸</span>
+          <p style={{ color: "#F5E6D3", opacity: 0.5, fontFamily: "'Heebo', sans-serif", fontSize: 14 }}>טוען...</p>
+        </div>
+      ) : (
       <div style={{ maxWidth: 480, margin: "0 auto", padding: "0 20px", position: "relative", zIndex: 1 }}>
 
         {/* Header */}
@@ -841,6 +851,7 @@ export default function App() {
             onBack={goBack}
             isAdmin={isAdmin}
             onEdit={() => setView("edit-song")}
+            chordDB={CHORD_DB}
           />
         )}
 
@@ -849,11 +860,15 @@ export default function App() {
           <SongEditor
             song={{ ...selectedSong, lyrics: getSongLyrics(selectedSong) }}
             artist={selectedArtist}
-            onSave={(newLyrics) => {
-              saveEditedLyrics(selectedArtist.id, selectedSong.id, newLyrics);
+            onSave={async (newLyrics) => {
+              await supabase.from("songs").update({ lyrics: newLyrics }).eq("artist_id", selectedArtist.id).eq("id", selectedSong.id);
+              setSelectedSong({ ...selectedSong, lyrics: newLyrics });
+              // Update local artists state
+              setArtists(prev => prev.map(a => a.id === selectedArtist.id ? { ...a, songs: a.songs.map(s => s.id === selectedSong.id ? { ...s, lyrics: newLyrics } : s) } : a));
               setView("song");
             }}
             onCancel={() => setView("song")}
+            chordDB={CHORD_DB}
           />
         )}
 
@@ -900,16 +915,31 @@ export default function App() {
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, paddingBottom: 30 }}>
               {filtered.map((name, i) => (
-                <div key={name} style={{
+                <div key={name} onClick={() => setSelectedChord(name)} style={{
                   background: "#ffffff06", borderRadius: 16, padding: "12px 4px",
                   border: "1px solid #ffffff0a", textAlign: "center",
                   transition: "all 0.3s ease",
                   animation: `fadeIn 0.4s ease ${i * 30}ms both`,
+                  position: "relative",
+                  cursor: "pointer",
                 }}
                   onMouseEnter={e => { e.currentTarget.style.background = "#ffffff0c"; e.currentTarget.style.borderColor = "#FF6B3530"; }}
                   onMouseLeave={e => { e.currentTarget.style.background = "#ffffff06"; e.currentTarget.style.borderColor = "#ffffff0a"; }}
                 >
-                  <ChordDiagram name={name} size={95} />
+                  <ChordDiagram name={name} size={95} chordDB={CHORD_DB} />
+                  {isAdmin && (
+                    <button onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!confirm(`למחוק את ${name}?`)) return;
+                      await supabase.from("chords").delete().eq("name", name);
+                      setChordDB(prev => { const next = { ...prev }; delete next[name]; return next; });
+                    }} style={{
+                      position: "absolute", top: 4, right: 4,
+                      background: "#ff444430", border: "none", borderRadius: "50%",
+                      width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center",
+                      color: "#ff6666", fontSize: 12, cursor: "pointer", padding: 0, lineHeight: 1,
+                    }}>×</button>
+                  )}
                 </div>
               ))}
               {filtered.length === 0 && (
@@ -923,6 +953,50 @@ export default function App() {
           );
         })()}
 
+        {/* פופאפ אקורד */}
+        {selectedChord && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,0.75)", zIndex: 1000,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            animation: "fadeIn 0.25s ease",
+          }} onClick={() => setSelectedChord(null)}>
+            <div onClick={e => e.stopPropagation()} style={{
+              background: "linear-gradient(135deg, #1e1e3a, #1A1A2E)",
+              borderRadius: 24, padding: "32px 28px 28px",
+              border: "1px solid #FF6B3530", width: 300, textAlign: "center",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+              position: "relative",
+            }}>
+              <button onClick={() => setSelectedChord(null)} style={{
+                position: "absolute", top: 12, left: 12,
+                background: "none", border: "none", color: "#F5E6D3",
+                opacity: 0.4, fontSize: 20, cursor: "pointer", lineHeight: 1,
+              }}>×</button>
+              <ChordDiagram name={selectedChord} size={200} chordDB={CHORD_DB} />
+              <div style={{
+                marginTop: 20, paddingTop: 18,
+                borderTop: "1px solid #ffffff10",
+              }}>
+                <p style={{
+                  fontFamily: "'Heebo', sans-serif", color: "#F5E6D3",
+                  fontSize: 15, fontWeight: 600, direction: "rtl", margin: "0 0 4px",
+                }}>מחפש שיעורי גיטרה?</p>
+                <p style={{
+                  fontFamily: "'Heebo', sans-serif", color: "#FF6B35",
+                  fontSize: 14, fontWeight: 700, margin: "0 0 12px", direction: "rtl",
+                }}>מור — בסיס ומעלה</p>
+                <a href="tel:0542550950" style={{
+                  display: "inline-block", background: "#FF6B35", color: "#1A1A2E",
+                  textDecoration: "none", borderRadius: 12, padding: "10px 24px",
+                  fontSize: 16, fontFamily: "'Heebo', sans-serif", fontWeight: 700,
+                  direction: "ltr",
+                }}>054-255-0950</a>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         <div style={{
           textAlign: "center", padding: "30px 0 40px",
@@ -933,6 +1007,7 @@ export default function App() {
           </p>
         </div>
       </div>
+      )}
     </div>
   );
 }

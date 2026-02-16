@@ -4,3 +4,9 @@ dist
 .env.*
 \!.env.example
 *.log
+NUL
+nul
+*.png
+temp_*
+*temp_*
+.playwright-mcp/
