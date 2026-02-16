@@ -96,7 +96,7 @@ function ChordDiagram({ name, size = 120, chordDB = {} }) {
 
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-      <text x={w / 2} y={h * 0.1} textAnchor="middle" fill="#F5E6D3" fontSize={size * 0.16} fontFamily="'Instrument Serif', serif" fontWeight="400">{name}</text>
+      <text x={w / 2} y={h * 0.1} textAnchor="middle" fill="#F5E6D3" fontSize={size * 0.16} fontFamily="'Instrument Serif', serif" fontWeight="400" direction="ltr">{name}</text>
       <line x1={startX} y1={startY} x2={endX} y2={startY} stroke="#F5E6D3" strokeWidth={3} strokeLinecap="round" />
       {[0, 1, 2, 3, 4, 5].map(i => (
         <line key={`s${i}`} x1={startX + i * stringSpacing} y1={startY} x2={startX + i * stringSpacing} y2={endY} stroke="#F5E6D3" strokeWidth={0.8} opacity={0.5} />
@@ -310,6 +310,7 @@ function SongView({ song, artist, onBack, isAdmin, onEdit, chordDB = {} }) {
                         visibility: part.chord ? "visible" : "hidden",
                         padding: "0 2px",
                         borderRadius: 4,
+                        direction: "ltr",
                         background: part.chord && hoveredChord === `${i}-${j}` ? artist.color + "25" : "transparent",
                         transition: "background 0.2s ease",
                       }}>{part.chord || "\u00A0"}</span>
@@ -428,6 +429,7 @@ function SongEditor({ song, artist, onSave, onCancel, chordDB = {} }) {
               fontWeight: 600, fontFamily: "'Instrument Serif', serif",
               cursor: "grab", userSelect: "none",
               transition: "all 0.15s ease",
+              direction: "ltr",
             }}
           >{c}</div>
         ))}
@@ -460,13 +462,16 @@ function SongEditor({ song, artist, onSave, onCancel, chordDB = {} }) {
                     }}
                   >
                     <span
+                      draggable={!!w.chord}
+                      onDragStart={w.chord ? () => { setDraggedChord(w.chord); removeChord(lineIdx, wordIdx); } : undefined}
                       onClick={w.chord ? () => removeChord(lineIdx, wordIdx) : undefined}
                       style={{
                         fontSize: 13, fontWeight: 700, height: 20,
                         color: w.chord ? artist.color : "transparent",
                         fontFamily: "'Instrument Serif', serif",
-                        cursor: w.chord ? "pointer" : "default",
+                        cursor: w.chord ? "grab" : "default",
                         userSelect: "none",
+                        direction: "ltr",
                       }}
                     >{w.chord || "\u00A0"}</span>
                     <span style={{
