@@ -297,7 +297,7 @@ function SongView({ song, artist, onBack, isAdmin, onEdit, chordDB = {} }) {
           const parts = parseLine(line);
           const hasChords = parts.some(p => p.chord);
           return (
-            <div key={i} style={{ marginBottom: hasChords ? 6 : 4 }}>
+            <div key={i} style={{ marginBottom: hasChords ? 6 : 4, direction: "rtl" }}>
               {hasChords ? (
                 <div style={{ display: "inline" }}>
                   {parts.map((part, j) => (
