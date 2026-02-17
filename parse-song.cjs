@@ -57,17 +57,14 @@ https.get(url, res => {
                 chords.push({ name: chordName, rawPos: totalChordChars });
                 totalChordChars += chordName.length;
               } else {
-                // Count &nbsp; as spacing characters
+                // Count only &nbsp; as spacing characters (ignore HTML formatting whitespace like tabs/newlines)
                 const nbspCount = (part.match(/&nbsp;/g) || []).length;
                 totalChordChars += nbspCount;
-                // Also count any plain text/spaces
-                const plainText = part.replace(/&nbsp;/g, '').replace(/<[^>]+>/g, '');
-                totalChordChars += plainText.length;
               }
             }
 
             // === Parse lyrics text ===
-            let lyrics = lyricMatch[1].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+            let lyrics = lyricMatch[1].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&amp;/g, '&').trim();
             // Collapse multiple spaces into single space
             lyrics = lyrics.replace(/\s+/g, ' ');
 
